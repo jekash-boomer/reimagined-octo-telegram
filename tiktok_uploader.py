@@ -291,10 +291,10 @@ if __name__ == "__main__":
     # Choose mode:
     
     # MODE 1: Upload ALL videos at once
-    main(upload_all=True)
+    # main(upload_all=True)
     
     # MODE 2: Upload one video (for daily automation)
-    # main(upload_all=False)
+    main(upload_all=False)
     
     # For 24-hour automation using system scheduler:
     # Linux/Mac: Add to crontab:  0 9 * * * /usr/bin/python3 /path/to/script.py
