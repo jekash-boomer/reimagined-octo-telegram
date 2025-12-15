@@ -120,7 +120,7 @@ def download_tiktok_video(video_info):
         ydl_opts = {
             'outtmpl': output_file,
             'format': 'best',
-            'impersonate': 'chrome',  # Impersonate Chrome browser
+            # 'impersonate': 'chrome',  # Impersonate Chrome browser
             'quiet': False,
             'no_warnings': False,
         }
