@@ -3,6 +3,7 @@ import time
 import json
 from datetime import datetime
 import subprocess
+import re
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -63,7 +64,7 @@ def get_youtube_service():
 
 def get_all_tiktok_videos():
     """
-    Fetch ALL videos from the TikTok account in chronological order (oldest first)
+    Fetch ALL videos from the TikTok account in chronological order (NEWEST first)
     Using yt-dlp Python module
     """
     print(f"Fetching all videos from @{TIKTOK_USERNAME}...")
@@ -96,8 +97,7 @@ def get_all_tiktok_videos():
                         'url': entry.get('url') or entry.get('webpage_url') or f"https://www.tiktok.com/@{TIKTOK_USERNAME}/video/{entry.get('id')}"
                     })
             
-            # Reverse to get oldest first
-            videos.reverse()
+            # DO NOT reverse - keep newest first
             
             print(f"Found {len(videos)} videos total")
             return videos
@@ -181,18 +181,40 @@ def download_tiktok_video(video_info):
         print("3. OR try using a VPN/different network")
         return None
 
+def clean_title(title):
+    """Remove 'tiktok' and '#tiktok' from title (case insensitive)"""
+    # Remove tiktok and #tiktok (case insensitive)
+    title = re.sub(r'\b#?tiktok\b', '', title, flags=re.IGNORECASE)
+    
+    # Remove multiple spaces and trim
+    title = re.sub(r'\s+', ' ', title).strip()
+    
+    # If title is empty after cleaning, use default
+    if not title:
+        title = "Video"
+    
+    # Limit to 100 characters (YouTube limit)
+    if len(title) > 100:
+        title = title[:97] + "..."
+    
+    return title
+
 def upload_to_youtube(youtube, video_file, title, description):
     """Upload video to YouTube"""
     print(f"Uploading {video_file} to YouTube...")
     
-    # Limit title to 100 characters (YouTube limit)
-    title = title[:97] + "..." if len(title) > 100 else title
+    # Clean title - remove tiktok references
+    cleaned_title = clean_title(title)
+    
+    # Clean description - remove tiktok references
+    cleaned_description = re.sub(r'\b#?tiktok\b', '', description, flags=re.IGNORECASE)
+    cleaned_description = re.sub(r'\s+', ' ', cleaned_description).strip()
     
     body = {
         'snippet': {
-            'title': title,
-            'description': description + "\n\n📱#Shorts",
-            'tags': ['TikTok', 'shorts', TIKTOK_USERNAME],
+            'title': cleaned_title,
+            'description': cleaned_description + "\n\n📱#Shorts",
+            'tags': ['shorts', TIKTOK_USERNAME],
             'categoryId': '22'  # People & Blogs
         },
         'status': {
@@ -236,7 +258,7 @@ def main(upload_all=False):
     current_index = history.get('current_index', 0)
     uploaded_ids = history.get('uploaded_ids', [])
     
-    # Get all TikTok videos
+    # Get all TikTok videos (newest first)
     all_videos = get_all_tiktok_videos()
     
     if not all_videos:
