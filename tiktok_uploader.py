@@ -11,7 +11,7 @@ from googleapiclient.http import MediaFileUpload
 import pickle
 
 # Configuration
-TIKTOK_USERNAME = os.getenv('TIKTOK_USERNAME', 'your_tiktok_username')
+TIKTOK_USERNAME = os.getenv('TIKTOK_USERNAME', 'your_tiktok_username')  # Change this to your TikTok username
 UPLOAD_HISTORY_FILE = "uploaded_videos.json"
 CREDENTIALS_FILE = "credentials.json"  # YouTube API credentials
 TOKEN_FILE = "token.pickle"
@@ -76,7 +76,8 @@ def get_all_tiktok_videos():
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'extract_flat': True,
+            'extract_flat': 'in_playlist',  # Get more details
+            'skip_download': True,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -85,9 +86,13 @@ def get_all_tiktok_videos():
             videos = []
             if 'entries' in info:
                 for entry in info['entries']:
+                    # Get full title or description
+                    title = entry.get('title') or entry.get('description') or 'TikTok Video'
+                    
                     videos.append({
                         'id': entry.get('id', 'unknown'),
-                        'title': entry.get('title', 'TikTok Video'),
+                        'title': title,
+                        'description': entry.get('description', ''),
                         'url': entry.get('url') or entry.get('webpage_url') or f"https://www.tiktok.com/@{TIKTOK_USERNAME}/video/{entry.get('id')}"
                     })
             
@@ -103,7 +108,7 @@ def get_all_tiktok_videos():
         return []
 
 def download_tiktok_video(video_info):
-    """Download TikTok video using yt-dlp Python module with browser impersonation"""
+    """Download TikTok video using yt-dlp Python module with multiple fallback methods"""
     video_id = video_info['id']
     output_file = os.path.join(VIDEOS_DIR, f"tiktok_{video_id}.mp4")
     
@@ -117,23 +122,63 @@ def download_tiktok_video(video_info):
     try:
         import yt_dlp
         
-        ydl_opts = {
-            'outtmpl': output_file,
-            'format': 'best',
-            # 'impersonate': 'chrome',  # Impersonate Chrome browser
-            'quiet': False,
-            'no_warnings': False,
-        }
+        # Try multiple methods in order
+        methods = [
+            {
+                'name': 'Browser Impersonation (curl-cffi)',
+                'opts': {
+                    'outtmpl': output_file,
+                    'format': 'best',
+                    'impersonate': 'chrome',
+                }
+            },
+            {
+                'name': 'Cookies (if cookies.txt exists)',
+                'opts': {
+                    'outtmpl': output_file,
+                    'format': 'best',
+                    'cookiefile': 'cookies.txt',
+                }
+            },
+            {
+                'name': 'Standard download',
+                'opts': {
+                    'outtmpl': output_file,
+                    'format': 'best',
+                }
+            }
+        ]
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video_info['url']])
+        for method in methods:
+            try:
+                # Skip cookies method if file doesn't exist
+                if 'cookiefile' in method['opts'] and not os.path.exists('cookies.txt'):
+                    continue
+                
+                print(f"Trying: {method['name']}...")
+                with yt_dlp.YoutubeDL(method['opts']) as ydl:
+                    ydl.download([video_info['url']])
+                
+                if os.path.exists(output_file):
+                    print(f"✓ Downloaded successfully using: {method['name']}")
+                    return output_file
+                    
+            except Exception as method_error:
+                print(f"  ✗ {method['name']} failed: {str(method_error)[:100]}")
+                continue
         
-        print(f"Downloaded: {output_file}")
-        return output_file
+        # If all methods failed
+        raise Exception("All download methods failed")
+        
     except Exception as e:
         print(f"Error downloading video: {e}")
-        print("\nTip: Make sure curl-cffi is installed:")
-        print("pip install 'yt-dlp[curl-cffi]'")
+        print("\n💡 SOLUTIONS:")
+        print("1. Install curl-cffi: pip install curl-cffi")
+        print("2. OR use cookies from your browser:")
+        print("   - Install 'Get cookies.txt LOCALLY' browser extension")
+        print("   - Go to tiktok.com and login")
+        print("   - Export cookies and save as 'cookies.txt' in script directory")
+        print("3. OR try using a VPN/different network")
         return None
 
 def upload_to_youtube(youtube, video_file, title, description):
@@ -146,7 +191,7 @@ def upload_to_youtube(youtube, video_file, title, description):
     body = {
         'snippet': {
             'title': title,
-            'description': description + "\n\n📱 Share and subscribe\n#Shorts",
+            'description': description + "\n\n📱 Originally posted on TikTok\n#TikTok #Shorts",
             'tags': ['TikTok', 'shorts', TIKTOK_USERNAME],
             'categoryId': '22'  # People & Blogs
         },
@@ -248,7 +293,7 @@ def main(upload_all=False):
                 youtube,
                 video_file,
                 video_to_upload['title'],
-                video_to_upload.get('description', 'Check out my other content!')
+                video_to_upload.get('description', 'Check out my TikTok content!')
             )
             
             # Update history
@@ -291,7 +336,8 @@ def main(upload_all=False):
 
 if __name__ == "__main__":
     # Install required packages first:
-    # pip install yt-dlp google-api-python-client google-auth
+    # pip install 'yt-dlp[curl-cffi]' google-api-python-client google-auth
+    # Note: curl-cffi is required for TikTok downloads to work
     
     # Choose mode:
     
