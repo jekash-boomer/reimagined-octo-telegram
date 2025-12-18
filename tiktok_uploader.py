@@ -212,7 +212,7 @@ def upload_to_youtube(youtube, video_file, title, description):
     
     body = {
         'snippet': {
-            'title': cleaned_title,
+            'title': cleaned_description,
             'description': cleaned_description + "\n\n📱#Shorts",
             'tags': ['shorts', TIKTOK_USERNAME],
             'categoryId': '22'  # People & Blogs
